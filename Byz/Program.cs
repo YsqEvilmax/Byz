@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -18,28 +19,7 @@ namespace Byz
 
         static void Main()
         {
-            //var sw = Stopwatch.StartNew();
             Network.Start().Wait();
-            //sw.Stop();
-            //sw.ElapsedMilliseconds.Dump("ElapsedMilliseconds");
-
-            //Node.Vertex.Count.Dump("NodeCount");
-            //Node.EdgeCount.Dump("EdgeCount");
-            //Node.MessageCount.Dump("MessageCount");
-
-            //var SpanningTree =
-            //    from k in Node.Vertex.Keys
-            //    select new { Node = Node.Vertex[k].Nid, Node.Vertex[k].Parent };
-            //SpanningTree.Dump("SpanningTree");
-
-            //EIGTree<int> t = new EIGTree<int>(0);
-            //t.setInitValue(1);
-            //t.labelSet = "1234";
-            //t.Build(3);
-
-            //List<EIGNode<int>> x = null;
-            //for (int i=0; i< 3; i++)
-            //    x = t.FindOnLevel(i);
 
             Console.ReadLine();
         }
@@ -102,7 +82,7 @@ namespace Byz
                                 {
                                     String[] s = line.Split(' ');
                                     Node.Link(int.Parse(s[0]), int.Parse(s[1]), int.Parse(s[2]), int.Parse(s[3]));
-                                }       
+                                }
                             }
                             foreach (int nid in Node.Vertex.Keys)
                             {
@@ -110,6 +90,7 @@ namespace Byz
                                 Node.Vertex[nid].NeighDelay = Node.Vertex[nid].NeighDelay.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
                             }
 
+                            sw.Start();
                             var tasks = new List<Task>();
                             foreach (int nid in Node.Vertex.Keys)
                             {
@@ -118,18 +99,8 @@ namespace Byz
                             }
 
                             await Task.WhenAll(tasks);
-
-                            foreach (int nid in Node.Vertex.Keys)
-                            {
-                                if (Node.Vertex[nid] is TraitorNode)
-                                {
-                                    Console.WriteLine("{0}:*", nid);
-                                }
-                                else
-                                {
-                                    Console.WriteLine("{0}:{1}", nid, (Node.Vertex[nid] as ByzNode).tree.root.Majority());
-                                }
-                            }
+                            sw.Stop();
+                            Display();
                         }
                     }
                 }
@@ -138,6 +109,28 @@ namespace Byz
                     Console.WriteLine(e.Message);
                 }
             }
+
+            static protected void Display()
+            {
+                foreach (int nid in Node.Vertex.Keys)
+                {
+                    if (Node.Vertex[nid] is TraitorNode)
+                    {
+                        Console.WriteLine("{0}:*", nid);
+                    }
+                    else
+                    {
+                        Console.WriteLine("{0}:{1}", nid, (Node.Vertex[nid] as ByzNode).tree.root.Majority());
+                    }
+                }
+
+                Console.WriteLine("total time {0} ms", sw.ElapsedMilliseconds);
+                Console.WriteLine("node count {0}", Node.Vertex.Count());
+                Console.WriteLine("edge count {0}", Node.EdgeCount);
+                Console.WriteLine("message count {0}", Node.MessageCount);
+            }
+
+            static private Stopwatch sw = new Stopwatch();
         }
 
         // --- your actual Echo implementation ---
@@ -210,45 +203,88 @@ namespace Byz
                 this.script = script;
             }
 
-
             protected internal override async Task<object> Run()
             {
                 Init();
+                int[] reveiveCount = new int[FaultyCount + 1];
+
+                Prepare(script);
+                String s = MSGs[0, 0];
+                //List<String> scriptALl = this.script.Split(';').ToList();
                 for (int i = 0; i < FaultyCount + 1; i++)
                 {
-                    String[] scriptALl = this.script.Split(';');
+                    
                     //find all nodes on last level
                     List<EIGNode<int>> lastLevel = tree.root.FindOnLevel(i);
                     //remove the nodes on last level whose label contains process id
                     lastLevel.RemoveAll(c => c.label.Contains(this.Nid.ToString()));
 
-                    String[] msg = scriptALl[i + 1].Split(' ');
+                    //String[] msg = scriptALl[i + 1].Split(' ');
+                    int index = 0;
                     foreach (int n in NeighDelay.Keys)
                     {
                         //fake
-                        int copy = 0;
-                        foreach (char c in msg[n - 1])
-                        {
-                            lastLevel[copy].label = n.ToString();
-                            lastLevel[copy++].value = int.Parse(c.ToString());
-                        }
-                        ByzMessage x = new ByzMessage(i, lastLevel);
+                        Fake(MSGs[i, index++], ref lastLevel);
                         //await 
-                        PostAsync(x, n, NeighDelay[n]);
+                        PostAsync(new ByzMessage(i, lastLevel), n, NeighDelay[n]);
                     }
-                    //if (TRACE_POST) Console.WriteLine();
 
-                    for (uint n = 0; n < NeighDelay.Count(); n++)
+                    while (reveiveCount[i] < NeighDelay.Count())
                     {
                         var ntok = await ReceiveAsync();
                         Tuple<int, object, int> result = ntok;
+                        reveiveCount[(result.Item2 as ByzMessage).round]++;
                     }
-                    //if (TRACE_RECEIVE) Console.WriteLine();
                 }
                 return Nid;
             }
 
+            private void Fake(String msg, ref List<EIGNode<int>> lastLevel)
+            {
+                int i = 0;
+                foreach (EIGNode<int> e in lastLevel)
+                {
+                    e.label = msg;
+                    if (i < msg.Length)
+                    {
+                        e.value = int.Parse(msg[i++].ToString());
+                    }
+                    else
+                    {
+                        //Add fault message if length of message is not enough
+                        e.value = ByzNode.MSG_FAULT;
+                    }
+                }
+            }
+
+            private void Prepare(String script)
+            {
+                MSGs = new String[FaultyCount + 1, Node.Vertex.Count];
+                int MSGLength = 1;
+                List<String> scriptRound = script.Split(';').ToList();
+                scriptRound.RemoveAt(0);
+                for(int i = 0; i < FaultyCount + 1; i++)
+                {
+                    if(i >= scriptRound.Count)
+                    {
+                        scriptRound.Add(new String(' ', Node.Vertex.Count));
+                    }
+                    List<String> scriptNode = scriptRound[i].Split(' ').ToList();
+                    scriptNode.RemoveAt(0);
+                    for(int j = 0; j < Node.Vertex.Count; j++)
+                    {
+                        if(j >= scriptNode.Count)
+                        {
+                            scriptNode.Add(new String((char)(ByzNode.MSG_FAULT + '0'), MSGLength));
+                        }
+                        MSGs[i, j] = scriptNode[j];
+                    }
+                    MSGLength *= Vertex.Count - i - 1;
+                }
+            }
+
             private String script { get; set; }
+            private String[,] MSGs;
         }
 
         protected internal class LoyalNode : ByzNode
@@ -289,11 +325,9 @@ namespace Byz
                             if (updateNode != null)
                             {
                                 updateNode.value = u.value;
-                                //if (Nid == 2) Console.WriteLine("{0}  --   {1}    ----- {2}", labelTarget, u.value, (result.Item2 as ByzMessage).round);
                             }
                         }
                     }
-                    //if(TRACE_RECEIVE) Console.WriteLine();
                 }
                 return Nid;
             }

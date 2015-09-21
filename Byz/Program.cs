@@ -44,92 +44,10 @@ namespace Byz
             Console.ReadLine();
         }
 
-        protected internal class Item<V>
-        {
-            public Item(int t1, int t2)
-            {
-                this.t1 = t1;
-                this.t2 = t2;
-            }
-
-            public override String ToString()
-            {
-                return String.Format("{0} {1} {2} {3}\n", t1, t2, v1, v2);
-            }
-
-            public int t1 { get; private set; }
-            public int t2 { get; private set; }
-            public V v1 { get; set; }
-            public V v2 { get; set; }
-        }
-
-        protected internal class Merge
-        {
-            public Merge()
-            {
-                container = new List<Item<int>>();
-            }
-
-            public Merge(int nodes)
-                : this()
-            {
-                for (int i = 1; i <= nodes; i++)
-                {
-                    for (int j = i; j <= nodes; j++)
-                    {
-                        container.Add(new Item<int>(i, j));
-                    }
-                }
-
-            }
-
-            public void put(String s)
-            {
-                string[] all = s.Split(' ');
-                int t1 = int.Parse(all[0]);
-                int t2 = int.Parse(all[1]);
-                int v = int.Parse(all[2]);
-                put(t1, t2, v);
-            }
-
-            public void put(int t1, int t2, int v)
-            {
-                int min = t1, max = t2;
-                if (t1 > t2)
-                {
-                    min = t2; max = t1;
-                }
-                int index = container.FindIndex((c) => { return c.t1 == min && c.t2 == max; });
-                while (index < 0)
-                {
-                    container.Add(new Item<int>(min, max));
-                    index = container.FindIndex((c) => { return c.t1 == min && c.t2 == max; });
-                }
-                if (t1 <= t2) container[index].v1 = v;
-                if (t1 >= t2) container[index].v2 = v;
-            }
-
-            public override String ToString()
-            {
-                String result = null;
-                foreach (Item<int> i in container)
-                {
-                    result += i.ToString();
-                }
-                return result;
-            }
-
-            public List<Item<int>> container = new List<Item<int>>();
-        }
-
-
-        // ---
-
         protected internal sealed class Network
         {
             static internal async Task Start()
             {
-                //String allLabelSet = "";
                 Node.Reset();
                 Console.Write("Please enter the file name to start (such as Generals.txt): ");
                 string path;
@@ -176,24 +94,21 @@ namespace Byz
                                     }
                                 }
                             }
+                            Node.Vertex = Node.Vertex.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
 
-
-                            Merge M = new Merge();
-                            for (int i = 0; i < NodeCount * NodeCount; i++)
+                            for (int i = 0; i < NodeCount * (NodeCount - 1) / 2; i++)
                             {
                                 if ((line = sr.ReadLine()) != null)
                                 {
-                                    M.put(line);
-                                }
+                                    String[] s = line.Split(' ');
+                                    Node.Link(int.Parse(s[0]), int.Parse(s[1]), int.Parse(s[2]), int.Parse(s[3]));
+                                }       
                             }
-                            String s = M.ToString();
-                            foreach (Item<int> item in M.container)
+                            foreach (int nid in Node.Vertex.Keys)
                             {
-                                Node.Link(item.t1, item.t2, item.v1, item.v2);
+                                Node.Link(nid, nid, 0, 0);
+                                Node.Vertex[nid].NeighDelay = Node.Vertex[nid].NeighDelay.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
                             }
-
-
-                            //Ready();
 
                             var tasks = new List<Task>();
                             foreach (int nid in Node.Vertex.Keys)
@@ -394,8 +309,8 @@ namespace Byz
         {
             // static members
 
-            static protected internal bool TRACE_THREAD = false;
-            static protected internal bool TRACE_INIT = true;
+            static protected internal bool TRACE_THREAD = true;
+            static protected internal bool TRACE_INIT = false;
             static protected internal bool TRACE_POST = false;
             static protected internal bool TRACE_RECEIVE = true;
             static protected internal bool TRACE_PARENT = false;
@@ -455,7 +370,8 @@ namespace Byz
 
             protected internal async Task<bool> PostAsync(object tok, int nid2, int dly2)
             {
-                MessageCount += 1;
+                // MessageCount += 1;
+                Interlocked.Increment(ref MessageCount);
 
                 if (TRACE_POST)
                 {
@@ -482,5 +398,4 @@ namespace Byz
         }
     }
 }
-
 // ---

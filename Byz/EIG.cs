@@ -6,6 +6,74 @@ using System.Threading.Tasks;
 
 namespace Byz
 {
+    public class Label<T>
+        : List<T>
+    {
+        public Label() : base() { }
+        public Label(IEnumerable<T> collection) : base(collection){ }
+
+        public override bool Equals(object obj)
+        {
+            return this.ToString().Equals((obj as Label<T>).ToString());
+        }
+        public override string ToString()
+        {
+            Trim();
+            String result = null;
+            foreach(T t in this)
+            {
+                result += "," + t.ToString();
+            }
+            return result != null ? result.Remove(0, 1) : result;
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+
+        public void Trim()
+        {
+            this.RemoveAll(x => x.Equals(""));
+        }
+
+        public static bool operator ==(Label<T> label1, Label<T> label2)
+        {  
+            return Object.Equals(label1, label2);
+        }
+        public static bool operator !=(Label<T> label1, Label<T> label2)
+        {
+            return !Object.Equals(label1, label2);
+        }
+
+        public static Label<T> operator +(Label<T> label1, Label<T> label2)
+        {
+            Label<T> targetLabel = new Label<T>();
+            targetLabel.AddRange(label1);
+            targetLabel.AddRange(label2);
+            targetLabel.Trim();
+            return targetLabel;
+        }
+
+        public static Label<T> operator +(Label<T> label, T t)
+        {
+            Label<T> targetLabel = new Label<T>();
+            if (label != null) { targetLabel.AddRange(label); }
+            targetLabel.Add(t);
+            targetLabel.Trim();
+            return targetLabel;
+        }
+
+        public static Label<T> operator -(Label<T> label, T t)
+        {
+            Label<T> targetLabel = new Label<T>();
+            if (label != null) targetLabel.AddRange(label);
+            targetLabel.Remove(t);
+            targetLabel.Trim();
+            return targetLabel;
+        }
+    }
+
     public class EIGNode<T>
         : ICloneable
     {
@@ -23,7 +91,12 @@ namespace Byz
         public EIGNode(EIGNode<T> parent, String label)
             : this(parent)
         {
-            this.label = label;
+
+            this.label = new Label<string>();
+            foreach(String s in label.Split(','))
+            {
+                this.label.Add(s);
+            }
         }
 
         public EIGNode(EIGNode<T> parent, String label, int level)
@@ -37,11 +110,12 @@ namespace Byz
             var Obj = new EIGNode<T>();
             //Obj.parent = this.parent != null ? this.parent.Clone() as EIGNode<T> : null;
             Obj.children = this.children.Clone<EIGNode<T>>();
+            Obj.label = new Label<String>(this.label.Clone<String>());
             Obj.value = this.value;
             return Obj;
         }
 
-        public void Build(String labelSet, int depth)
+        public void Build(Label<String> labelSet, int depth)
         {
             if (level < depth)
             {
@@ -53,13 +127,19 @@ namespace Byz
             }
         }
 
-        public EIGNode<T> Find(String labelTarget)
+        public EIGNode<T> Find(Label<String> labelTarget)
         {
-            if (labelTarget == this.label) return this;
-            String labelExt = labelTarget[0].ToString();
-            EIGNode<T> node = FindChild(labelExt);
-            if (node == null) return null;
-            return node.Find(labelTarget);
+            EIGNode<T> node = null;
+            if (labelTarget.Equals(this.label))
+            {
+                return this;
+            }
+            foreach (EIGNode<T> n in children)
+            {
+                node = n.Find(labelTarget);
+                if (node != null) return node;
+            }
+            return node;
         }
 
         public List<EIGNode<T>> FindOnLevel(int levelTarget)
@@ -71,7 +151,7 @@ namespace Byz
             }
             else if (levelTarget == this.level)
             {
-                node.Add(this);
+                node.Add(this.Clone() as EIGNode<T>);
             }
             else if (levelTarget > this.level)
             {
@@ -91,25 +171,24 @@ namespace Byz
 
         public void AddChild(String labelExt)
         {
-            children.Add(new EIGNode<T>(this, label + labelExt, this.level + 1));
+            children.Add(new EIGNode<T>(this, (label + labelExt).ToString(), this.level + 1));
         }
 
-        public void AddChildren(String labelSet)
+        public void AddChildren(Label<String> labelSet)
         {
-            String rest = RestLabel(labelSet);
-            foreach (char c in rest)
+            RestLabel(ref labelSet);
+            foreach (string s in labelSet)
             {
-                AddChild(c.ToString());
+                AddChild(s);
             }
         }
 
-        public String RestLabel(String labelSet)
-        {
-            foreach (char c in label)
+        public void RestLabel(ref Label<String> labelSet)
+        {          
+            foreach (String s in label)
             {
-                labelSet = labelSet.Replace(c.ToString(), "");
+                labelSet = labelSet - s;
             }
-            return labelSet;
         }
 
         public T Majority()
@@ -141,13 +220,13 @@ namespace Byz
 
         public override String ToString()
         {
-            return "(" + label + ":" + value.ToString() + ")";
+            return "(" + label.ToString() + ":" + value.ToString() + ")";
         }
 
         private EIGNode<T> parent;
         private List<EIGNode<T>> children;
         public int level { get; private set; }
-        public String label { get;  set; }
+        public Label<String> label { get;  set; }
         public T value { get; set; }
     }
 
@@ -168,12 +247,13 @@ namespace Byz
             : this(v)
         {
             setInitValue(v);
+            this.labelSet = new Label<string>(labelSet.Split(',').OrderBy(x => x));
         }
 
         public void Build(int depth)
         {
-            this.depth = depth <= labelSet.Length + 1 ? depth : labelSet.Length + 1;
-            root.Build(labelSet, this.depth);
+            this.depth = depth <= labelSet.Count + 1 ? depth : labelSet.Count + 1;
+            root.Build(labelSet, this.depth - 1);
         }
 
         public void setInitValue(T v)
@@ -192,13 +272,17 @@ namespace Byz
             String result = null;
             for(int i = 0; i < depth; i++)
             {
-                result += root.FindOnLevel(i).ToString() + "\r\n";
+                foreach(String level in root.FindOnLevel(i).Select(x => x.ToString()).ToList())
+                {
+                    result += level;
+                }
+                result += "\r\n";
             }
             return result;
         }
 
         public int depth { get; private set; }
-        public String labelSet { get; set; }
+        public Label<String> labelSet;
         public EIGNode<T> root { get; private set; }
     }
 }

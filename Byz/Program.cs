@@ -24,9 +24,7 @@ namespace Byz
     {
         static int NodeCount = 0;
         static int FaultyCount = 0;
-        static String allLabelSet = "";
-
-
+        static Label<String> allLabelSet = new Label<string>();
 
         static void Main()
         {
@@ -73,7 +71,7 @@ namespace Byz
                                     int v = int.Parse(nodes[1]);
                                     int status = int.Parse(nodes[2]);
 
-                                    if (!allLabelSet.Contains(id.ToString())) { allLabelSet += id.ToString(); }
+                                    if (!allLabelSet.Contains(id.ToString())) { allLabelSet.Add(id.ToString()); }
 
                                     if (status == 0)
                                     {
@@ -134,7 +132,7 @@ namespace Byz
                     {
                         Console.WriteLine("{0}:{1}", nid, (Node.Vertex[nid] as ByzNode).tree.root.Majority());
                     }
-                    Console.WriteLine("{0}", (Node.Vertex[nid] as ByzNode).tree.ToString());
+                    //Console.WriteLine("{0}", (Node.Vertex[nid] as ByzNode).tree.ToString());
                 }
 
                 Console.WriteLine("total time {0} ms", sw.ElapsedMilliseconds);
@@ -192,11 +190,9 @@ namespace Byz
                 tree.setInitValue(val);
             }
 
-            public void BuildEIG(String labelSet, int depth)
+            public void BuildEIG(Label<String> labelSet, int depth)
             {
-                char[] temp = labelSet.ToCharArray();
-                Array.Sort(temp);
-                tree.labelSet = new String(temp);
+                tree.labelSet = new Label<string>(labelSet.OrderBy(x => x));
                 tree.Build(depth);
             }
 
@@ -219,34 +215,51 @@ namespace Byz
 
             protected internal override async Task<object> Run()
             {
-                Init();
-                int[] reveiveCount = new int[FaultyCount + 1];
-
-                Prepare(script);
-                for (int i = 0; i < FaultyCount + 1; i++)
+                try
                 {
-                    
-                    //find all nodes on last level
-                    List<EIGNode<int>> lastLevel = tree.root.FindOnLevel(i);
-                    //remove the nodes on last level whose label contains process id
-                    lastLevel.RemoveAll(c => c.label.Contains(this.Nid.ToString()));
+                    Init();
+                    int[] reveiveCount = new int[FaultyCount + 1];
 
-                    int index = 0;
-                    foreach (int n in NeighDelay.Keys)
+                    Prepare(script);
+                    for (int i = 0; i < FaultyCount + 1; i++)
                     {
-                        //fake
-                        Fake(MSGs[i, index++], ref lastLevel);
-                        //await 
-                        PostAsync(new ByzMessage(i, lastLevel), n, NeighDelay[n]);
-                    }
 
-                    while (reveiveCount[i] < NeighDelay.Count())
-                    {
-                        var ntok = await ReceiveAsync();
-                        Tuple<int, object, int> result = ntok;
-                        reveiveCount[(result.Item2 as ByzMessage).round]++;
+                        //find all nodes on last level
+                        List<EIGNode<int>> lastLevel = tree.root.FindOnLevel(i);
+                        //remove the nodes on last level whose label contains process id
+                        lastLevel.RemoveAll(c => c.label.Contains(this.Nid.ToString()));
+
+                        int index = 0;
+                        foreach (int n in NeighDelay.Keys)
+                        {
+                            //fake
+                            Fake(MSGs[i, index++], ref lastLevel);
+                            //await 
+                            PostAsync(new ByzMessage(i, lastLevel), n, NeighDelay[n]);
+                        }
+
+                        while (reveiveCount[i] < NeighDelay.Count())
+                        {
+                            var ntok = await ReceiveAsync();
+                            Tuple<int, object, int> result = ntok;
+                            List<EIGNode<int>> updates = (result.Item2 as ByzMessage).nodes;
+                            reveiveCount[(result.Item2 as ByzMessage).round]++;
+                            foreach (EIGNode<int> u in updates)
+                            {
+                                Label<String> labelTarget = u.label + result.Item1.ToString();
+                                EIGNode<int> updateNode = tree.root.Find(labelTarget);
+                                if (updateNode != null)
+                                {
+                                    updateNode.value = u.value;
+                                }
+                            }
+                        }
                     }
                 }
+                catch(Exception e)
+                {
+                    Console.WriteLine(e);
+                }            
                 return Nid;
             }
 
@@ -305,38 +318,45 @@ namespace Byz
 
             protected internal override async Task<object> Run()
             {
-                Init();
-
-                int[] reveiveCount = new int[FaultyCount + 1];
-                for (int i = 0; i < FaultyCount + 1; i++)
+                try
                 {
-                    //find all nodes on last level
-                    List<EIGNode<int>> lastLevel = tree.root.FindOnLevel(i);
-                    //remove the nodes on last level whose label contains process id
-                    lastLevel.RemoveAll(c => c.label.Contains(this.Nid.ToString()));
+                    Init();
 
-                    foreach (int n in NeighDelay.Keys)
+                    int[] reveiveCount = new int[FaultyCount + 1];
+                    for (int i = 0; i < FaultyCount + 1; i++)
                     {
-                        //await 
-                        PostAsync(new ByzMessage(i, lastLevel), n, NeighDelay[n]);
-                    }
+                        //find all nodes on last level
+                        List<EIGNode<int>> lastLevel = tree.root.FindOnLevel(i);
+                        //remove the nodes on last level whose label contains process id
+                        lastLevel.RemoveAll(c => c.label.Contains(this.Nid.ToString()));
 
-                    while (reveiveCount[i] < NeighDelay.Count())
-                    {
-                        var ntok = await ReceiveAsync();
-                        Tuple<int, object, int> result = ntok;
-                        List<EIGNode<int>> updates = (result.Item2 as ByzMessage).nodes;
-                        reveiveCount[(result.Item2 as ByzMessage).round]++;
-                        foreach (EIGNode<int> u in updates)
+                        foreach (int n in NeighDelay.Keys)
                         {
-                            String labelTarget = u.label + result.Item1.ToString();
-                            EIGNode<int> updateNode = tree.root.Find(labelTarget);
-                            if (updateNode != null)
+                            //await 
+                            PostAsync(new ByzMessage(i, lastLevel), n, NeighDelay[n]);
+                        }
+
+                        while (reveiveCount[i] < NeighDelay.Count())
+                        {
+                            var ntok = await ReceiveAsync();
+                            Tuple<int, object, int> result = ntok;
+                            List<EIGNode<int>> updates = (result.Item2 as ByzMessage).nodes;
+                            reveiveCount[(result.Item2 as ByzMessage).round]++;
+                            foreach (EIGNode<int> u in updates)
                             {
-                                updateNode.value = u.value;
+                                Label<String> labelTarget = u.label + result.Item1.ToString();
+                                EIGNode<int> updateNode = tree.root.Find(labelTarget);
+                                if (updateNode != null)
+                                {
+                                    updateNode.value = u.value;
+                                }
                             }
                         }
                     }
+                }
+                catch(Exception e)
+                {
+                    Console.WriteLine(e);
                 }
                 return Nid;
             }

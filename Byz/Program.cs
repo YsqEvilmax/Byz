@@ -11,11 +11,22 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Byz
 {
+    static class Extentions  
+    {
+        public static List<T> Clone<T>(this List<T> listToClone)
+            where T : ICloneable
+        {
+            return listToClone.Select(x => (T)x.Clone()).ToList();
+        }
+    }
+
     class Program
     {
         static int NodeCount = 0;
         static int FaultyCount = 0;
         static String allLabelSet = "";
+
+
 
         static void Main()
         {
@@ -49,6 +60,8 @@ namespace Byz
                                 String[] indexs = line.Split(' ');
                                 NodeCount = int.Parse(indexs[0]);
                                 v0 = int.Parse(indexs[1]);
+
+                                FaultyCount = (int)Math.Ceiling((NodeCount - 1.00) / 3);
                             }
                             for (int i = 0; i < NodeCount; i++)
                             {
@@ -70,7 +83,6 @@ namespace Byz
                                     {
                                         String script = line.Substring(line.IndexOf(';'));
                                         new TraitorNode(id, v, script);
-                                        FaultyCount++;
                                     }
                                 }
                             }
@@ -110,7 +122,7 @@ namespace Byz
                 }
             }
 
-            static protected void Display()
+            static internal void Display()
             {
                 foreach (int nid in Node.Vertex.Keys)
                 {
@@ -122,6 +134,7 @@ namespace Byz
                     {
                         Console.WriteLine("{0}:{1}", nid, (Node.Vertex[nid] as ByzNode).tree.root.Majority());
                     }
+                    Console.WriteLine("{0}", (Node.Vertex[nid] as ByzNode).tree.ToString());
                 }
 
                 Console.WriteLine("total time {0} ms", sw.ElapsedMilliseconds);
@@ -144,14 +157,15 @@ namespace Byz
             protected internal ByzMessage(int round, List<EIGNode<int>> nodes)
                 : this(round)
             {
-                this.nodes = new List<EIGNode<int>>(nodes);
+                //this.nodes = new List<EIGNode<int>>(nodes);
+                this.nodes = nodes.Clone<EIGNode<int>>();
             }
 
             public int round { get; private set; }
 
             public List<EIGNode<int>> nodes { get; private set; }
 
-            public override string ToString()
+            public override String ToString()
             {
                 String code = null;
                 foreach (EIGNode<int> n in nodes)
@@ -209,8 +223,6 @@ namespace Byz
                 int[] reveiveCount = new int[FaultyCount + 1];
 
                 Prepare(script);
-                String s = MSGs[0, 0];
-                //List<String> scriptALl = this.script.Split(';').ToList();
                 for (int i = 0; i < FaultyCount + 1; i++)
                 {
                     
@@ -219,7 +231,6 @@ namespace Byz
                     //remove the nodes on last level whose label contains process id
                     lastLevel.RemoveAll(c => c.label.Contains(this.Nid.ToString()));
 
-                    //String[] msg = scriptALl[i + 1].Split(' ');
                     int index = 0;
                     foreach (int n in NeighDelay.Keys)
                     {
@@ -244,7 +255,6 @@ namespace Byz
                 int i = 0;
                 foreach (EIGNode<int> e in lastLevel)
                 {
-                    e.label = msg;
                     if (i < msg.Length)
                     {
                         e.value = int.Parse(msg[i++].ToString());
@@ -265,7 +275,7 @@ namespace Byz
                 scriptRound.RemoveAt(0);
                 for(int i = 0; i < FaultyCount + 1; i++)
                 {
-                    if(i >= scriptRound.Count)
+                    if (i >= scriptRound.Count)
                     {
                         scriptRound.Add(new String(' ', Node.Vertex.Count));
                     }
@@ -307,7 +317,6 @@ namespace Byz
 
                     foreach (int n in NeighDelay.Keys)
                     {
-                        foreach (EIGNode<int> e in lastLevel) e.label = n.ToString();
                         //await 
                         PostAsync(new ByzMessage(i, lastLevel), n, NeighDelay[n]);
                     }
@@ -343,7 +352,7 @@ namespace Byz
         {
             // static members
 
-            static protected internal bool TRACE_THREAD = true;
+            static protected internal bool TRACE_THREAD = false;
             static protected internal bool TRACE_INIT = false;
             static protected internal bool TRACE_POST = false;
             static protected internal bool TRACE_RECEIVE = true;

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 namespace Byz
 {
     public class EIGNode<T>
+        : ICloneable
     {
         public EIGNode()
         {
@@ -29,6 +30,15 @@ namespace Byz
             : this(parent, label)
         {
             this.level = level;
+        }
+
+        public object Clone()
+        {
+            var Obj = new EIGNode<T>();
+            //Obj.parent = this.parent != null ? this.parent.Clone() as EIGNode<T> : null;
+            Obj.children = this.children.Clone<EIGNode<T>>();
+            Obj.value = this.value;
+            return Obj;
         }
 
         public void Build(String labelSet, int depth)
@@ -120,12 +130,18 @@ namespace Byz
                     }
                 }
                 if (collection.Count() == 0) { collection.Add(this.value, 1); }
-                collection.OrderByDescending(u => u.Value);             
+                collection = collection.OrderByDescending(x => x.Value).ToDictionary(x => x.Key, x => x.Value);
             }
             catch(Exception e)
             {
+                Console.WriteLine(e);
             }
             return collection.First().Key;
+        }
+
+        public override String ToString()
+        {
+            return "(" + label + ":" + value.ToString() + ")";
         }
 
         private EIGNode<T> parent;
@@ -169,6 +185,16 @@ namespace Byz
         {
             if (levelTarget >= depth) return null;
             return root.FindOnLevel(levelTarget);
+        }
+
+        public override String ToString()
+        {
+            String result = null;
+            for(int i = 0; i < depth; i++)
+            {
+                result += root.FindOnLevel(i).ToString() + "\r\n";
+            }
+            return result;
         }
 
         public int depth { get; private set; }

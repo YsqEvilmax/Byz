@@ -189,35 +189,63 @@ namespace Byz
             }
         }
 
-        public T Majority()
+        //public T Majority()
+        //{
+        //    Dictionary<T, int> collection = new Dictionary<T, int>();
+        //    try
+        //    {               
+        //        foreach (EIGNode<T> n in children)
+        //        {
+        //            T major = n.Majority();
+        //            if (collection.Keys.Contains<T>(major))
+        //            {
+        //                collection[n.value]++;
+        //            }
+        //            else
+        //            {
+        //                collection.Add(major, 1);
+        //            }
+        //        }
+        //        if (collection.Count() == 0) { collection.Add(this.value, 1); }
+        //        else
+        //        {
+        //            collection = collection.OrderByDescending(x => x.Value).ToDictionary(x => x.Key, x => x.Value);
+        //        }
+        //        this.value = collection.First().Key;
+        //    }
+        //    catch(Exception e)
+        //    {
+        //        Console.WriteLine(e);
+        //    }
+        //    return this.value;
+        //}
+
+        public void Majority()
         {
-            Dictionary<T, int> collection = new Dictionary<T, int>();
             try
-            {               
-                foreach (EIGNode<T> n in children)
+            {
+                Dictionary<T, int> collection = new Dictionary<T, int>();
+                foreach(EIGNode<T> n in children)
                 {
-                    T major = n.Majority();
-                    if (collection.Keys.Contains<T>(major))
+                    n.Majority();
+                    if(collection.Keys.Contains(n.value))
                     {
                         collection[n.value]++;
                     }
                     else
                     {
-                        collection.Add(major, 1);
+                        collection.Add(n.value, 1);
                     }
                 }
-                if (collection.Count() == 0) { collection.Add(this.value, 1); }
-                else
+                if(collection.Count > 0)
                 {
-                    collection = collection.OrderByDescending(x => x.Value).ToDictionary(x => x.Key, x => x.Value);
+                    this.value = collection.OrderByDescending(x => x.Value).ToDictionary(x => x.Key, x => x.Value).First().Key;
                 }
-                this.value = collection.First().Key;
             }
             catch(Exception e)
             {
                 Console.WriteLine(e);
             }
-            return this.value;
         }
 
         public override String ToString()

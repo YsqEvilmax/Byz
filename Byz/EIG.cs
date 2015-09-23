@@ -220,14 +220,14 @@ namespace Byz
         //    return this.value;
         //}
 
-        public void Majority()
+        public void Majority(T originalValue)
         {
             try
             {
                 Dictionary<T, int> collection = new Dictionary<T, int>();
                 foreach(EIGNode<T> n in children)
                 {
-                    n.Majority();
+                    n.Majority(originalValue);
                     if(collection.Keys.Contains(n.value))
                     {
                         collection[n.value]++;
@@ -241,6 +241,10 @@ namespace Byz
                 {
                     this.value = collection.OrderByDescending(x => x.Value).ToDictionary(x => x.Key, x => x.Value).First().Key;
                 }
+                //if(collection.Values.Count(x => x == collection.Values.First()) > 1)
+                //{
+                //    this.value = originalValue;
+                //}
             }
             catch(Exception e)
             {
@@ -297,12 +301,31 @@ namespace Byz
             return root.FindOnLevel(levelTarget);
         }
 
+        public void Majority()
+        {
+            this.root.Majority(this.root.value);
+        }
+
         public override String ToString()
         {
             String result = null;
             for(int i = 0; i < depth; i++)
             {
                 foreach(String level in root.FindOnLevel(i).Select(x => x.ToString()).ToList())
+                {
+                    result += level;
+                }
+                result += "\r\n";
+            }
+            return result;
+        }
+
+        public String ValueToString()
+        {
+            String result = null;
+            for (int i = 0; i < depth; i++)
+            {
+                foreach (String level in root.FindOnLevel(i).Select(x => x.value.ToString()).ToList())
                 {
                     result += level;
                 }

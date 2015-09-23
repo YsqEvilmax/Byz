@@ -122,17 +122,17 @@ namespace Byz
             {
                 foreach (int nid in Node.Vertex.Keys)
                 {
-                    //Console.WriteLine("{0}", (Node.Vertex[nid] as ByzNode).tree.ToString());
+                    //Console.WriteLine("{0}", (Node.Vertex[nid] as ByzNode).tree.ValueToString());
                     if (Node.Vertex[nid] is TraitorNode)
                     {
                         Console.WriteLine("{0}:*", nid);
                     }
                     else
                     {
-                        (Node.Vertex[nid] as ByzNode).tree.root.Majority();
+                        (Node.Vertex[nid] as ByzNode).tree.Majority();
                         Console.WriteLine("{0}:{1}", nid, (Node.Vertex[nid] as ByzNode).tree.root.value);
                     }
-                    Console.WriteLine("{0}", (Node.Vertex[nid] as ByzNode).tree.ToString());
+                    //Console.WriteLine("{0}", (Node.Vertex[nid] as ByzNode).tree.ValueToString());
                 }
 
                 Console.WriteLine("total time {0} ms", sw.ElapsedMilliseconds);

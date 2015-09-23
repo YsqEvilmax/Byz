@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -124,6 +122,7 @@ namespace Byz
             {
                 foreach (int nid in Node.Vertex.Keys)
                 {
+                    Console.WriteLine("{0}", (Node.Vertex[nid] as ByzNode).tree.ToString());
                     if (Node.Vertex[nid] is TraitorNode)
                     {
                         Console.WriteLine("{0}:*", nid);
@@ -461,4 +460,3 @@ namespace Byz
         }
     }
 }
-// ---

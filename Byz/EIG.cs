@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Byz
 {
@@ -209,13 +207,17 @@ namespace Byz
                     }
                 }
                 if (collection.Count() == 0) { collection.Add(this.value, 1); }
-                collection = collection.OrderByDescending(x => x.Value).ToDictionary(x => x.Key, x => x.Value);
+                else
+                {
+                    collection = collection.OrderByDescending(x => x.Value).ToDictionary(x => x.Key, x => x.Value);
+                }
+                this.value = collection.First().Key;
             }
             catch(Exception e)
             {
                 Console.WriteLine(e);
             }
-            return collection.First().Key;
+            return this.value;
         }
 
         public override String ToString()
